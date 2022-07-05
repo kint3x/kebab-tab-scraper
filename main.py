@@ -17,8 +17,18 @@ CHORD_PATTERN = "\[ch\](.*?)\[/ch\]"
 A4_HEIGHT = 3508/2.7
 A4_WIDTH = 2480/2.7
 
+PTtoMM = 0.3527777778
+A4MM_HEIGHT = 297
+A4MM_WIDTH = 210
+
 height_cnt = 0
 col_cnt = 0
+
+#Global pdf
+x_coord = 10.0
+y_coord = 10.0
+left_column = True
+base_font_size = 12
 
 
 def download_tab(url):
@@ -127,35 +137,126 @@ def merge_tabs_to_html(songs):
 
 	return html_inner
 
-def merge_tabs_to_pdf(songs):
+def get_song_max_width(pdf,lines):
+	i_curr = 12;
+	found = False
 
-	pdfkit.from_string(merge_tabs_to_html(songs), 'out.pdf' , options = {
-    'page-height': str(A4_HEIGHT)+'px',
-    'page-width': str(A4_WIDTH)+'px',})
+	while not found:
+		found = True
+		pdf.set_font_size(i_curr)
+		for line in lines:
+			line = line.replace("[b]","")
+			line = line.replace("[/b]","")
+			if(pdf.get_string_width(line) > A4MM_WIDTH/2-20):
+				found = False
+				if i_curr < 9:
+					i_curr -= 0.2
+				else:
+					i_curr -= 1
+				break
+	return i_curr
+
+
+
+
+def write_formatted_line(pdf, txt):
+	global x_coord,y_coord,left_column,base_font_size
+
+	x_coord = 10 if left_column else (A4MM_WIDTH/2)+5
+
+	i = 0
+	br = False
+	skip = False
+	while i < len(txt):
+	
+		if txt[i] == '[':
+			if txt[i+1] == 'b':
+				pdf.set_font('Roboto MonoB')
+				skip = True
+				i = i+1
+			elif txt[i+1] == '/':
+				pdf.set_font('Roboto Mono')
+				skip = True
+				i = i+1
+			while txt[i-1]!= ']' and skip:
+				i += 1
+				if i >= len(txt):
+					y_coord += pdf.font_size + 0.2
+					return
+			skip = False
+					
+		pdf.text(x_coord,y_coord,txt[i])
+		x_coord += pdf.get_string_width(txt[i])
+
+		i += 1
+		
+	y_coord += pdf.font_size + 0.005*base_font_size
+		
+
 	return
 
+def make_title_pdf(pdf,name, author, key, capo):
+	global base_font_size
+	pdf.set_font_size(base_font_size+3)
+	write_formatted_line(pdf,"[b]"+name+"[/b] - "+author)
+	pdf.set_font_size(base_font_size+2)
+	write_formatted_line(pdf,"Key:"+"[b]"+key+"[/b]"+" Capo:"+"[b]"+capo+"[/b]")
+
+	return
+
+def generate_pdf(songs):
+	global x_coord,y_coord,left_column,base_font_size
+	x_coord = 10
+	y_coord = 10
+
+	pdf = FPDF('P', 'mm', 'A4')
+	pdf.add_font('Roboto Mono', '', os.getcwd()+"/fonts/RobotoMono-Regular.ttf", uni = True)
+	pdf.add_font('Roboto MonoB', '', os.getcwd()+"/fonts/RobotoMono-Bold.ttf", uni = True)
+
+	pdf.set_font('Roboto Mono', style = '', size = 12)
+	pdf.add_page()
+
+
+	for song in songs:
+		
+		song["content"]=song["content"].replace("[ch]","[b]")
+		song["content"]=song["content"].replace("[/ch]","[/b]")+("\n  \n  ")
+		lineiterator = iter(song["content"].splitlines())
+		base_font_size = get_song_max_width(pdf,lineiterator)
+		make_title_pdf(pdf,song["songname"],song["artist"],song["key"],song["capo"])
+		pdf.set_font_size(base_font_size)
+		lineiterator = iter(song["content"].splitlines())
+		for line in lineiterator:
+
+			if (pdf.font_size + y_coord >= A4MM_HEIGHT-10) or ("[b]" in line and 2*pdf.font_size + y_coord >= A4MM_HEIGHT-10):
+				if left_column:
+					left_column = False
+					y_coord = 10
+				else:
+					pdf.add_page()
+					left_column = True
+					y_coord = 10
+			write_formatted_line(pdf,line)
+
+		ln_x = 10 if left_column else (A4MM_WIDTH/2)+5
+		ln_y = y_coord-pdf.font_size-0.5
+		pdf.line(ln_x,ln_y,ln_x+(A4MM_WIDTH/2)-10,ln_y)
+
+	pdf.output('out.pdf', 'F')
+
+	return
 
 
 def main():
 	download_tab_urls=["https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
 	"https://tabs.ultimate-guitar.com/tab/ed-sheeran/i-dont-care-chords-2704800",
-	"https://tabs.ultimate-guitar.com/tab/vance-joy/riptide-chords-1237247",
-	"https://tabs.ultimate-guitar.com/tab/passenger/let-her-go-chords-1137467",
-	"https://tabs.ultimate-guitar.com/tab/coldplay/yellow-chords-114080",
-	"https://tabs.ultimate-guitar.com/tab/the-cranberries/zombie-chords-844902",
-	"https://tabs.ultimate-guitar.com/tab/elton-john/your-song-chords-29113",
-	"https://tabs.ultimate-guitar.com/tab/john-legend/all-of-me-chords-1248578",
-	"https://tabs.ultimate-guitar.com/tab/john-legend/all-of-me-chords-1248578",
-	"https://tabs.ultimate-guitar.com/tab/johnny-cash/hurt-chords-89849",
-	"https://tabs.ultimate-guitar.com/tab/the-beatles/hey-jude-chords-1061739",
 	]
 	downloaded_songs = []
 	for url in download_tab_urls:
 		downloaded_songs.append(download_tab(url));
 
-	merge_tabs_to_pdf(downloaded_songs)
-	print(merge_tabs_to_html(downloaded_songs))
-
+	generate_pdf(downloaded_songs)
+	#var_dump(downloaded_songs)
 	return
 
 

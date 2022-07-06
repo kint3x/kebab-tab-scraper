@@ -4,7 +4,7 @@ import sys
 import json
 import requests
 import html
-from var_dump import var_dump
+#from var_dump import var_dump
 from time import sleep
 from fpdf import FPDF
 import pdfkit

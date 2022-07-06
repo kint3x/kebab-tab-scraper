@@ -83,8 +83,13 @@ def download_tab_supermusic(url):
 
 	song = doc(".piesen").html()
 
-
+	
 	new_html = re.sub(r'(<script(.|\n)*?</script>)', '', song)
+
+	
+	new_html = re.sub(r'<div.*?>(.*?)<\/div>', '\2', new_html)
+	new_html = re.sub(r'<img.*?/>', '', new_html)
+	
 
 	new_html = html.unescape(new_html)
 
@@ -220,7 +225,6 @@ def generate_pdf(songs):
 		song["content"]=song["content"].replace("[ch]","[b]")
 		song["content"]=song["content"].replace("[/ch]","[/b]")+("\n  \n  ")
 		song["content"]=song["content"].replace("][","] [")
-		print(song["content"])
 		lineiterator = iter(song["content"].splitlines())
 		base_font_size = get_song_max_width(pdf,lineiterator)
 		make_title_pdf(pdf,song["songname"],song["artist"],song["key"],song["capo"])
@@ -250,8 +254,9 @@ def generate_pdf(songs):
 def main():
 	download_tab_urls=[#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
 	#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/i-dont-care-chords-2704800",
-	"https://supermusic.cz/skupina.php?action=piesen&idskupiny=0&idpiesne=1030861"
-	#"https://tabs.ultimate-guitar.com/tab/coldplay/viva-la-vida-chords-675427"
+	#"https://supermusic.cz/skupina.php?action=piesen&idskupiny=0&idpiesne=1030861",
+	#"https://supermusic.cz/skupina.php?action=piesen&idskupiny=157&idpiesne=774651",
+	"https://supermusic.cz/skupina.php?idpiesne=18371"
 	]
 	downloaded_songs = []
 

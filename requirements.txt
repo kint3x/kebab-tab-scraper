@@ -1,9 +1,5 @@
-os
-re
-sys
-json
+regex
 requests
-html
 fpdf
 pdfkit
 pyquery

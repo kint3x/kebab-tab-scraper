@@ -8,7 +8,7 @@ from var_dump import var_dump
 from time import sleep
 from fpdf import FPDF
 import pdfkit
-
+from pyquery import PyQuery as pq
 
 RESULTS_PATTERN_TAB = "\"wiki_tab\":({.*?})"
 DATA_CONTENT = "data-content=\"(.*)\""
@@ -31,7 +31,7 @@ left_column = True
 base_font_size = 12
 
 
-def download_tab(url):
+def download_tab_ultimate_guitar(url):
 	response = requests.get(url)
 
 	try:
@@ -45,7 +45,7 @@ def download_tab(url):
 	songname = response_data.get("store",{}).get("page",{}).get("data",{}).get("tab",{}).get("song_name","")
 	artist = response_data.get("store",{}).get("page",{}).get("data",{}).get("tab",{}).get("artist_name","")
 	key = response_data.get("store",{}).get("page",{}).get("data",{}).get("tab",{}).get("tonality_name","")
-	capo = str(response_data.get("store",{}).get("page",{}).get("data",{}).get("tab_view",{}).get("meta",{}).get("capo","0"))
+	capo = str(response_data.get("store",{}).get("page",{}).get("data",{}).get("tab_view",{}).get("meta",{}).get("capo","-"))
 
 	content = response_data.get("store",{}).get("page",{}).get("data",{}).get("tab_view",{}).get("wiki_tab",{}).get("content","")
 	
@@ -67,75 +67,73 @@ def download_tab(url):
 
 	return ret
 
-def start_end_check_space(px, text = False):
-	global height_cnt,col_cnt
-	if((height_cnt+px+40 > A4_HEIGHT) and not text):
-		height_cnt_o = height_cnt
-		height_cnt = px
-		col_cnt += 1
-		if(col_cnt % 2 == 1):
-			spacer = "<div class='spacer'></div>"
-		else:
-			spacer = ""
-		return "</div>{}<div class='col'>".format(spacer)
-	else:
-		height_cnt += px
-		return ""
+def download_tab_supermusic(url):
 
+	response = requests.get(url)
 
-def merge_tabs_to_html(songs):
-	global height_cnt,col_cnt
-	html_inner = "<!DOCTYPE html><html><head>"
-	html_inner += "<style> @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap');	\
-	*{font-size: 13px; font-family: 'Roboto Mono', monospace;} \
-	.title {font-size:17px;} .title .song{font-weight:bold; font-size: 17px;}	\
-	ch{ font-weight:bold; background-color:#dddddd;}\
-	.line{ min-height:13px;}\
-	.col{ width:"+str(round((A4_WIDTH/2)-10,0))+"px;overflow:hidden;} \
-	body{ margin-left:30px; width:" + str(A4_WIDTH+30)+"px; display: flex; flex-wrap:wrap; justify-content:space-between;} \
-	.spacer{ width:100%; height:2px; }\
-	</style></head><body>\
-	<div class='col'>"
+	try:
+		response_body = html.unescape(response.text)
+		#results = re.search(DATA_CONTENT, response_body).group(1)
+	except AttributeError:
+		results = ''
 	
-	height_cnt = 0
-	col_cnt = 1
-	song_idx = 1
-	for song in songs:
-		line_cnt = 0
-		song["content"] = song["content"].replace("[ch]","<ch>")
-		song["content"] = song["content"].replace("[/ch]","</ch>")
+	doc = pq(response_body)
+	artist = doc(".test3").text().split(' - ')[0]
+	songname = doc(".test3").text().split(' - ')[1]
 
-		if(song_idx != 1):
-			margin = "</br>"
-		else:
-			margin = ""
+	song = doc(".piesen").html()
 
-		html_inner += start_end_check_space(15*2+22)
-		html_inner += "{}<div class='title'><span class='song song-{}'>{}</span> - {}</div>".format(margin,song_idx,song["songname"],song["artist"])
-		html_inner += "<div class='songinfo'><b>Key:</b> {} <b>Capo:</b>{}</div>".format(song["key"],song["capo"]) 
 
-		lineiterator = iter(song["content"].splitlines())
-		for line in lineiterator:
-			line_cnt += 1;
+	new_html = re.sub(r'(<script(.|\n)*?</script>)', '', song)
 
-			if "<ch>" not in line:
-				add_class = "text"
-				html_inner += start_end_check_space(16,True)
+	new_html = html.unescape(new_html)
+
+	new_html = re.sub(r'<a.*?class=\"sup\".*?>(.+?)</a>',r'[ch]\1[/ch]',new_html)
+
+	new_html = new_html.replace("<sup>","")
+	new_html = new_html.replace("</sup>","")
+
+	new_html = new_html.replace("<br/>","")
+
+	lineiterator = iter(new_html.splitlines()[:-2])
+	next(lineiterator)
+	#remove blank lines from beggining
+	beg = True
+	content=""
+	for line in lineiterator:
+		chord_line = ""
+		if beg:
+			if len(line) < 1:
+				continue
 			else:
-				add_class = "chords"
-				html_inner += start_end_check_space(16)
-			if(add_class == "text"):
-				line = line.strip()
-
-			
-			html_inner += "<div class='line {}'>{}</div>".format(add_class,line.replace(" ","&nbsp;"))
-
-		song_idx += 1
-
-	html_inner += "</div></body></html>"
+				beg = False
+		
+		chord_char_cnt = 0
+		if line.find('[ch]') != -1:
+			chords = re.findall(r'\[ch\].+?\[\/ch\]',line)
+			for i in range(line.count('[ch]')):
+				chord_line += " " * (line.find("[ch]") - (chord_line.count(' ')))
+				line = re.sub(r'(\[ch\].+?\[\/ch\])','',line,1)
+				chord_line += chords[i]
 
 
-	return html_inner
+		line = ' '+ line	
+
+		if len(chord_line) > 0:
+			content += chord_line +"\n" + line +"\n"
+		else:
+			content += line + "\n"
+
+
+	ret = {
+	"songname" : songname,
+	"artist"		: artist,
+	"key"	: "?",
+	"capo" : "?",
+	"content": content
+	}
+
+	return ret
 
 def get_song_max_width(pdf,lines):
 	i_curr = 12;
@@ -199,7 +197,7 @@ def make_title_pdf(pdf,name, author, key, capo):
 	global base_font_size
 	pdf.set_font_size(base_font_size+3)
 	write_formatted_line(pdf,"[b]"+name+"[/b] - "+author)
-	pdf.set_font_size(base_font_size+2)
+	pdf.set_font_size(base_font_size+1)
 	write_formatted_line(pdf,"Key:"+"[b]"+key+"[/b]"+" Capo:"+"[b]"+capo+"[/b]")
 
 	return
@@ -221,6 +219,8 @@ def generate_pdf(songs):
 		
 		song["content"]=song["content"].replace("[ch]","[b]")
 		song["content"]=song["content"].replace("[/ch]","[/b]")+("\n  \n  ")
+		song["content"]=song["content"].replace("][","] [")
+		print(song["content"])
 		lineiterator = iter(song["content"].splitlines())
 		base_font_size = get_song_max_width(pdf,lineiterator)
 		make_title_pdf(pdf,song["songname"],song["artist"],song["key"],song["capo"])
@@ -239,7 +239,7 @@ def generate_pdf(songs):
 			write_formatted_line(pdf,line)
 
 		ln_x = 10 if left_column else (A4MM_WIDTH/2)+5
-		ln_y = y_coord-pdf.font_size-0.5
+		ln_y = y_coord-pdf.font_size-1
 		pdf.line(ln_x,ln_y,ln_x+(A4MM_WIDTH/2)-10,ln_y)
 
 	pdf.output('out.pdf', 'F')
@@ -248,12 +248,18 @@ def generate_pdf(songs):
 
 
 def main():
-	download_tab_urls=["https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
-	"https://tabs.ultimate-guitar.com/tab/ed-sheeran/i-dont-care-chords-2704800",
+	download_tab_urls=[#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
+	#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/i-dont-care-chords-2704800",
+	"https://supermusic.cz/skupina.php?action=piesen&idskupiny=0&idpiesne=1030861"
+	#"https://tabs.ultimate-guitar.com/tab/coldplay/viva-la-vida-chords-675427"
 	]
 	downloaded_songs = []
+
 	for url in download_tab_urls:
-		downloaded_songs.append(download_tab(url));
+		if "ultimate-guitar" in url:
+			downloaded_songs.append(download_tab_ultimate_guitar(url))
+		elif "supermusic" in url:
+			downloaded_songs.append(download_tab_supermusic(url))
 
 	generate_pdf(downloaded_songs)
 	#var_dump(downloaded_songs)

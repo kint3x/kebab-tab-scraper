@@ -6,7 +6,7 @@ It is simple script so it should work withou problem after installing requiremen
 ```pip3 install -r requirements.txt```
     
 ### Use:
-
+New: Add songs URLs in file songslist.txt one line one song and then run script to generate.
 In ***main.py*** add urls of chords from ultimate-guitar or from supermusic.sk into array in main function. Then just run 
         ```python3 main.py``` 
 out.pdf file should be generated. 

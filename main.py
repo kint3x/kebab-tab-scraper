@@ -252,12 +252,16 @@ def generate_pdf(songs):
 
 
 def main():
-	download_tab_urls=[#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
+	"""download_tab_urls=[#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/afterglow-chords-3477983", 
 	#"https://tabs.ultimate-guitar.com/tab/ed-sheeran/i-dont-care-chords-2704800",
 	#"https://supermusic.cz/skupina.php?action=piesen&idskupiny=0&idpiesne=1030861",
 	#"https://supermusic.cz/skupina.php?action=piesen&idskupiny=157&idpiesne=774651",
 	"https://supermusic.cz/skupina.php?idpiesne=18371"
-	]
+	]"""
+	download_tab_urls = []
+	with open('songslist.txt') as my_file:
+	    for line in my_file:
+	        download_tab_urls.append(line.replace('\n',''))
 	downloaded_songs = []
 
 	for url in download_tab_urls:
